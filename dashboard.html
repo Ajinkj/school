@@ -80,74 +80,80 @@
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 
 <script>
- // Function to display map and user location
- const displayMap = () => {
-    const map = L.map('map').setView([0, 0], 10);
+// JavaScript
+// Function to display map and user location
+const displayMap = () => {
+  const map = L.map('map').setView([0, 0], 10);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
 
-    // Get user's location and display it on the map as "Your Location"
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+  // Get user's location and display it on the map as "Your Location"
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((position) => {
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
 
-        L.marker([latitude, longitude]).addTo(map)
-          .bindPopup('Your Location')
-          .openPopup();
-      });
-    } else {
-      alert('Geolocation is not supported by this browser.');
+      L.marker([latitude, longitude]).addTo(map)
+        .bindPopup('Your Location')
+        .openPopup();
+
+        // Set the map center to the worker's location
+      map.setView([latitude, longitude], 10);
+    });
+  } else {
+    alert('Geolocation is not supported by this browser.');
+  }
+
+  // Retrieve submissions data from local storage
+  const submissions = JSON.parse(localStorage.getItem('wasteReports')) || [];
+
+  // Display submissions on the map
+  submissions.forEach((submission) => {
+    const locationString = submission.location;
+    const [latitudeStr, longitudeStr] = locationString.split(', ');
+
+    const latitude = parseFloat(latitudeStr.replace('Latitude: ', ''));
+    const longitude = parseFloat(longitudeStr.replace('Longitude: ', ''));
+
+    // Check if the latitude and longitude values are valid numbers
+    if (!isNaN(latitude) && !isNaN(longitude)) {
+      L.marker([latitude, longitude]).addTo(map)
+        .bindPopup(submission.name)
+        .openPopup();
     }
+  });
 
-    // Retrieve submissions data from local storage
-    const submissions = JSON.parse(localStorage.getItem('wasteReports')) || [];
-
-    // Display submissions on the map
-    submissions.forEach((submission) => {
-      const locationString = submission.location;
-      const [latitudeStr, longitudeStr] = locationString.split(', ');
-
-      const latitude = parseFloat(latitudeStr.replace('Latitude: ', ''));
-      const longitude = parseFloat(longitudeStr.replace('Longitude: ', ''));
-
-      // Check if the latitude and longitude values are valid numbers
-      if (!isNaN(latitude) && !isNaN(longitude)) {
-        L.marker([latitude, longitude]).addTo(map)
-          .bindPopup(submission.name)
-          .openPopup();
-      }
-    });
-
-    // Display submissions data in the table
-    const submissionsTable = document.getElementById('submissions-table');
-    submissions.forEach((submission) => {
-      const newRow = submissionsTable.insertRow();
-      newRow.innerHTML = `
-        <td>${submission.name}</td>
-        <td>${submission.phone}</td>
-        <td>${submission.email}</td>
-        <td>${submission.address}</td>
-        <td>${submission.location}</td>
-        <td>${submission.wasteType}</td>
-        <td>${submission.quantity}</td>
-        <td>${submission.comments}</td>
-      `;
-    });
-  };
+  // Display submissions data in the table
+  const submissionsTable = document.getElementById('submissions-table');
+  submissions.forEach((submission) => {
+    const newRow = submissionsTable.insertRow();
+    newRow.innerHTML = `
+      <td>${submission.name}</td>
+      <td>${submission.phone}</td>
+      <td>${submission.email}</td>
+      <td>${submission.address}</td>
+      <td>${submission.location}</td>
+      <td>${submission.wasteType}</td>
+      <td>${submission.quantity}</td>
+      <td>${submission.comments}</td>
+    `;
+  });
+};
 
 // Function to generate the Google Maps directions URL
 function generateDirectionsURL(workerLocation, submittedLocations) {
   const baseURL = 'https://www.google.com/maps/dir/';
   const workerLatLong = `${workerLocation.latitude},${workerLocation.longitude}`;
-  const waypoints = submittedLocations.map((location) => `${location.latitude},${location.longitude}`).join(';');
+  const waypoints = submittedLocations.map((location) => `${location.latitude},${location.longitude}`);
 
-  const directionsURL = `${baseURL}${workerLatLong}/${encodeURIComponent(waypoints)}`;
+  // Construct the URL with starting location (worker) and destination locations (waypoints)
+  let directionsURL = `${baseURL}${workerLatLong}/`;
+  directionsURL += waypoints.map((waypoint) => encodeURIComponent(waypoint)).join('/');
+
   return directionsURL;
 }
-
 
 // Event listener for the "Show Directions" button
 const showDirectionButton = document.getElementById('show-directions');
@@ -183,8 +189,6 @@ if (showDirectionButton) {
   });
 }
 
-
-
 // Function to get the worker's current location (latitude and longitude) using the browser's geolocation API
 function getWorkerLocation() {
   return new Promise((resolve, reject) => {
@@ -205,9 +209,9 @@ function getWorkerLocation() {
   });
 }
 
+// Display the map and submissions data when the page loads
+displayMap();
 
-  // Display the map and submissions data when the page loads
-  displayMap();
 </script>
 
 </body>
