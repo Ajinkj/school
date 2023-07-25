@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding-top: 50px;
+    }
+
+    .header {
+      text-align: center;
+    }
+
+    /* Adjust the map container for smaller screens */
+    .map-container {
+      margin-top: 20px;
+      height: 300px;
+    }
+
+    /* Adjust the "Show Direction" button for smaller screens */
+    #showDirectionButton {
+      margin-bottom: 20px;
+    }
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+  </style>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+
+<div class="container mt-5">
+  <h2>Dashboard</h2>
+  <div id="map" style="height: 400px;"></div>
+  <button type="button" class="btn btn-primary mt-3" id="show-directions">Show Directions</button>
+  <a href="index.html" type="button" class="btn btn-secondary mt-3" >Back Home</a>
+  
+  <div class="table-container">
+    <h3 class="mt-5">Submissions</h3>
+    <table class="table table-striped mt-3">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Address</th>
+          <th>Location</th>
+          <th>Waste Type</th>
+          <th>Quantity</th>
+          <th>Comments</th>
+        </tr>
+      </thead>
+      <tbody id="submissions-table">
+        <!-- Table data will be populated dynamically using JavaScript -->
+      </tbody>
+    </table>
+  </div>
+  <div class="row mt-3">
+    <div class="col-md-6 offset-md-3">
+      <a href="index.html" class="btn btn-secondary btn-lg btn-block">Back to Home</a>
+    </div>
+  </div>
+</div>
+
+ 
+</div>
+
+<!-- Bootstrap JS (Make sure to include jQuery and Popper.js before this) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script>
+ // Function to display map and user location
+ const displayMap = () => {
+    const map = L.map('map').setView([0, 0], 10);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Get user's location and display it on the map as "Your Location"
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        L.marker([latitude, longitude]).addTo(map)
+          .bindPopup('Your Location')
+          .openPopup();
+      });
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+
+    // Retrieve submissions data from local storage
+    const submissions = JSON.parse(localStorage.getItem('wasteReports')) || [];
+
+    // Display submissions on the map
+    submissions.forEach((submission) => {
+      const locationString = submission.location;
+      const [latitudeStr, longitudeStr] = locationString.split(', ');
+
+      const latitude = parseFloat(latitudeStr.replace('Latitude: ', ''));
+      const longitude = parseFloat(longitudeStr.replace('Longitude: ', ''));
+
+      // Check if the latitude and longitude values are valid numbers
+      if (!isNaN(latitude) && !isNaN(longitude)) {
+        L.marker([latitude, longitude]).addTo(map)
+          .bindPopup(submission.name)
+          .openPopup();
+      }
+    });
+
+    // Display submissions data in the table
+    const submissionsTable = document.getElementById('submissions-table');
+    submissions.forEach((submission) => {
+      const newRow = submissionsTable.insertRow();
+      newRow.innerHTML = `
+        <td>${submission.name}</td>
+        <td>${submission.phone}</td>
+        <td>${submission.email}</td>
+        <td>${submission.address}</td>
+        <td>${submission.location}</td>
+        <td>${submission.wasteType}</td>
+        <td>${submission.quantity}</td>
+        <td>${submission.comments}</td>
+      `;
+    });
+  };
+
+// Function to generate the Google Maps directions URL
+function generateDirectionsURL(workerLocation, submittedLocations) {
+  const baseURL = 'https://www.google.com/maps/dir/';
+  const workerLatLong = `${workerLocation.latitude},${workerLocation.longitude}`;
+  const waypoints = submittedLocations.map((location) => `${location.latitude},${location.longitude}`).join(';');
+
+  const directionsURL = `${baseURL}${workerLatLong}/${encodeURIComponent(waypoints)}`;
+  return directionsURL;
+}
+
+
+// Event listener for the "Show Directions" button
+const showDirectionButton = document.getElementById('show-directions');
+if (showDirectionButton) {
+  showDirectionButton.addEventListener('click', () => {
+    // Get the worker's current location
+    getWorkerLocation()
+      .then((workerLocation) => {
+        const submissions = JSON.parse(localStorage.getItem('wasteReports')) || [];
+        // Check if there are any submitted locations
+        if (submissions.length > 0) {
+          // Get the submitted locations from the submissions array
+          const submittedLocations = submissions.map((submission) => {
+            const locationString = submission.location;
+            const [latitudeStr, longitudeStr] = locationString.split(', ');
+            const latitude = parseFloat(latitudeStr.replace('Latitude: ', ''));
+            const longitude = parseFloat(longitudeStr.replace('Longitude: ', ''));
+            return { latitude, longitude };
+          });
+
+          // Generate the Google Maps directions URL
+          const directionsURL = generateDirectionsURL(workerLocation, submittedLocations);
+
+          // Open the directions URL in a new tab
+          window.open(directionsURL, '_blank');
+        } else {
+          alert("No submissions found. Please submit a form first.");
+        }
+      })
+      .catch((error) => {
+        alert("Error getting worker's location: " + error);
+      });
+  });
+}
+
+
+
+// Function to get the worker's current location (latitude and longitude) using the browser's geolocation API
+function getWorkerLocation() {
+  return new Promise((resolve, reject) => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          resolve({ latitude, longitude });
+        },
+        (error) => {
+          reject(error.message);
+        }
+      );
+    } else {
+      reject("Geolocation is not available in this browser.");
+    }
+  });
+}
+
+
+  // Display the map and submissions data when the page loads
+  displayMap();
+</script>
+
+</body>
+</html>
